@@ -1,0 +1,38 @@
+Примеры для подключения к различным базам. Оставить один исходя из выбранной базы.
+
+{
+  "driver": "ODBC Driver 17 for SQL Server",
+  "server": "localhost",
+  "port": 1433,
+  "database": "MyDatabase",
+  "user": "YourUser",
+  "password": "YourPassword123"
+}
+
+{
+  "driver": "PostgreSQL Unicode",
+  "server": "localhost",
+  "port": 5432,
+  "database": "MyDatabase",
+  "user": "YourUser",
+  "password": "YourPassword123"
+}
+
+{
+  "driver": "MySQL ODBC 8.0 ANSI Driver",
+  "server": "localhost",
+  "port": 3306,
+  "database": "mydb",
+  "user": "YourUser",
+  "password": "YourPassword123"
+}
+
+{
+  "driver": "Microsoft Access Driver (*.mdb, *.accdb)",
+  "database": "C:\\path\\to\\your_database.accdb"
+}
+
+{
+  "driver": "SQLite3 ODBC Driver",
+  "database": "C:\\path\\to\\sqlite.db"
+}
