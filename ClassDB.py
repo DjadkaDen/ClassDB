@@ -1,7 +1,51 @@
-import sys
-import json
-import pyodbc
 import os
+import sys
+import subprocess
+import json
+
+SCRIPT_PATH = os.path.abspath(__file__)
+PROJECT_DIR = os.path.dirname(SCRIPT_PATH)
+CONFIG_PATH = os.path.join(PROJECT_DIR, "config.json")
+
+def self_update(repo_url):
+    try:
+        if not os.path.exists(os.path.join(PROJECT_DIR, ".git")):
+            # если запускают не из репозитория — клонируем
+            subprocess.check_call(["git", "clone", repo_url, PROJECT_DIR])
+        else:
+            # обновляем
+            subprocess.check_call(["git", "-C", PROJECT_DIR, "fetch", "origin"])
+            local = subprocess.check_output(
+                ["git", "-C", PROJECT_DIR, "rev-parse", "HEAD"]
+            ).strip()
+            remote = subprocess.check_output(
+                ["git", "-C", PROJECT_DIR, "rev-parse", "origin/master"]
+            ).strip()
+
+            if local != remote:
+                print("Обнаружена новая версия. Обновляем...")
+                subprocess.check_call(["git", "-C", PROJECT_DIR, "pull", "origin", "master"])
+                # перезапуск
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    except Exception as e:
+        print(f"Ошибка автообновления: {e}")
+
+
+# --- Проверка обновлений ---
+try:
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        config = json.load(f)
+
+    if config.get("auto_update", False):
+        repo_url = config.get("repo_url")
+        if repo_url:
+            self_update(repo_url)
+
+except Exception as e:
+    print(f"Не удалось загрузить config.json для автообновления: {e}")
+
+import pyodbc
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QDialog, QTextEdit, QDoubleSpinBox,
@@ -559,7 +603,6 @@ class MainWindow(QMainWindow):
         )
         self.conn.commit()
         self.load_goals()
-
 
     def delete_goal(self):
         row = self.goals_table.currentRow()

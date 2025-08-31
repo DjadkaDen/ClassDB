@@ -6,8 +6,9 @@
   "port": 1433,
   "database": "MyDatabase",
   "user": "YourUser",
-  "password": "YourPassword123"
-}
+  "password": "YourPassword123",
+  "repo_url": "https://github.com/username/ClassDB.git",
+  "auto_update": true}
 
 {
   "driver": "PostgreSQL Unicode",
@@ -15,8 +16,9 @@
   "port": 5432,
   "database": "MyDatabase",
   "user": "YourUser",
-  "password": "YourPassword123"
-}
+  "password": "YourPassword123",
+  "repo_url": "https://github.com/username/ClassDB.git",
+  "auto_update": true}
 
 {
   "driver": "MySQL ODBC 8.0 ANSI Driver",
@@ -24,15 +26,18 @@
   "port": 3306,
   "database": "mydb",
   "user": "YourUser",
-  "password": "YourPassword123"
-}
+  "password": "YourPassword123",
+  "repo_url": "https://github.com/username/ClassDB.git",
+  "auto_update": true}
 
 {
   "driver": "Microsoft Access Driver (*.mdb, *.accdb)",
-  "database": "C:\\path\\to\\your_database.accdb"
-}
+  "database": "C:\\path\\to\\your_database.accdb",
+  "repo_url": "https://github.com/username/ClassDB.git",
+  "auto_update": true}
 
 {
   "driver": "SQLite3 ODBC Driver",
-  "database": "C:\\path\\to\\sqlite.db"
-}
+  "database": "C:\\path\\to\\sqlite.db",
+  "repo_url": "https://github.com/username/ClassDB.git",
+  "auto_update": true}
