@@ -114,16 +114,36 @@ class MainWindow(QMainWindow):
 
         # --- Вкладка Люди ---
         people_tab = QWidget()
-        layout = QHBoxLayout()
-        people_tab.setLayout(layout)
+        people_layout = QHBoxLayout()
+        people_tab.setLayout(people_layout)
+
+        # Левый блок
+        left_widget = QWidget()
+        left_layout = QVBoxLayout()
+        left_widget.setLayout(left_layout)
 
         # Список людей
         self.people_list = QListWidget()
         self.people_list.currentItemChanged.connect(self.load_person_data)
-        layout.addWidget(self.people_list, 2)
+        left_layout.addWidget(self.people_list, 1)
 
-        # Справа
+        # Кнопки для списка людей
+        people_btns = QHBoxLayout()
+        btn_people_add = QPushButton("Добавить человека")
+        btn_people_edit = QPushButton("Редактировать")
+        btn_people_del = QPushButton("Удалить")
+        people_btns.addWidget(btn_people_add)
+        people_btns.addWidget(btn_people_edit)
+        people_btns.addWidget(btn_people_del)
+        btn_people_add.clicked.connect(self.add_person)
+        btn_people_edit.clicked.connect(self.edit_person)
+        btn_people_del.clicked.connect(self.delete_person)
+        left_layout.addLayout(people_btns)
+
+        # Правый блок
+        right_widget = QWidget()
         right_layout = QVBoxLayout()
+        right_widget.setLayout(right_layout)
 
         # Подписки
         self.subscriptions_list = QListWidget()
@@ -132,13 +152,12 @@ class MainWindow(QMainWindow):
 
         # Деньги
         right_layout.addWidget(QLabel("Деньги"))
-
         self.money_table = QTableWidget()
-        self.money_table.setEditTriggers(QTableWidget.NoEditTriggers)  # запрет прямого редактирования
+        self.money_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.money_table.cellDoubleClicked.connect(self.edit_money)
         right_layout.addWidget(self.money_table, 5)
 
-        # Кнопки CRUD
+        # Кнопки CRUD для денег
         btn_layout = QHBoxLayout()
         btn_add = QPushButton("Добавить")
         btn_add.clicked.connect(self.add_money)
@@ -151,8 +170,16 @@ class MainWindow(QMainWindow):
         btn_layout.addWidget(btn_delete)
         right_layout.addLayout(btn_layout)
 
-        layout.addLayout(right_layout, 5)
+        # Добавляем splitter
+        splitter = QSplitter()
+        splitter.addWidget(left_widget)
+        splitter.addWidget(right_widget)
 
+        # начальные пропорции (2:5)
+        splitter.setStretchFactor(0, 2)
+        splitter.setStretchFactor(1, 5)
+
+        people_layout.addWidget(splitter)
         tabs.addTab(people_tab, "Люди")
 
         # Загружаем список людей
@@ -615,6 +642,49 @@ class MainWindow(QMainWindow):
             self.cursor.execute("DELETE FROM goals WHERE id = ?;", (goal_id,))
             self.conn.commit()
             self.load_goals()
+
+    def add_person(self):
+        name, ok = QInputDialog.getText(self, "Новый человек", "Введите ФИО:")
+        if not ok or not name.strip():
+            return
+        self.cursor.execute(
+            "INSERT INTO people (full_name) VALUES (?);",
+            (name.strip(),)
+        )
+        self.conn.commit()
+        self.load_people()
+
+    def edit_person(self):
+        row = self.people_list.currentRow()
+        if row < 0:
+            return
+        item = self.people_list.currentItem()
+        person_id = item.data(1)
+        old_name = item.text()
+
+        new_name, ok = QInputDialog.getText(self, "Редактировать", "Новое ФИО:", text=old_name)
+        if not ok or not new_name.strip():
+            return
+        self.cursor.execute(
+            "UPDATE people SET full_name = ? WHERE id = ?;",
+            (new_name.strip(), person_id)
+        )
+        self.conn.commit()
+        self.load_people()
+
+    def delete_person(self):
+        row = self.people_list.currentRow()
+        if row < 0:
+            return
+        item = self.people_list.currentItem()
+        person_id = item.data(1)
+
+        reply = QMessageBox.question(self, "Удаление", f"Удалить {item.text()}?",
+                                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self.cursor.execute("DELETE FROM people WHERE id = ?;", (person_id,))
+            self.conn.commit()
+            self.load_people()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
