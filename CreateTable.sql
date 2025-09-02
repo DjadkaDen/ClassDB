@@ -4,10 +4,10 @@ CREATE TABLE people (
     full_name VARCHAR(255) NOT NULL,
     description VARCHAR(255)
 );
-COMMENT ON TABLE people IS 'люди';
-COMMENT ON COLUMN people.id IS 'Код';
-COMMENT ON COLUMN people.full_name IS 'ФИО';
-COMMENT ON COLUMN people.description IS 'Описание';
+COMMENT ON TABLE people IS 'Р»СЋРґРё';
+COMMENT ON COLUMN people.id IS 'РљРѕРґ';
+COMMENT ON COLUMN people.full_name IS 'Р¤РРћ';
+COMMENT ON COLUMN people.description IS 'РћРїРёСЃР°РЅРёРµ';
 
 -- Goals
 CREATE TABLE goals (
@@ -16,11 +16,11 @@ CREATE TABLE goals (
     description TEXT,
     priority INT
 );
-COMMENT ON TABLE goals IS 'цели';
-COMMENT ON COLUMN goals.id IS 'Код';
-COMMENT ON COLUMN goals.title IS 'Цель';
-COMMENT ON COLUMN goals.description IS 'Описание';
-COMMENT ON COLUMN goals.priority IS 'Приоритет';
+COMMENT ON TABLE goals IS 'С†РµР»Рё';
+COMMENT ON COLUMN goals.id IS 'РљРѕРґ';
+COMMENT ON COLUMN goals.title IS 'Р¦РµР»СЊ';
+COMMENT ON COLUMN goals.description IS 'РћРїРёСЃР°РЅРёРµ';
+COMMENT ON COLUMN goals.priority IS 'РџСЂРёРѕСЂРёС‚РµС‚';
 
 -- Money
 CREATE TABLE money (
@@ -30,38 +30,46 @@ CREATE TABLE money (
     date TIMESTAMP,
     goal_id INT REFERENCES goals(id) ON DELETE SET NULL
 );
-COMMENT ON TABLE money IS 'деньги';
-COMMENT ON COLUMN money.id IS 'Код';
-COMMENT ON COLUMN money.person_id IS 'ФИО';
-COMMENT ON COLUMN money.amount IS 'Сумма';
-COMMENT ON COLUMN money.date IS 'Дата';
-COMMENT ON COLUMN money.goal_id IS 'Цель';
+COMMENT ON TABLE money IS 'РґРµРЅСЊРіРё';
+COMMENT ON COLUMN money.id IS 'РљРѕРґ';
+COMMENT ON COLUMN money.person_id IS 'Р¤РРћ';
+COMMENT ON COLUMN money.amount IS 'РЎСѓРјРјР°';
+COMMENT ON COLUMN money.date IS 'Р”Р°С‚Р°';
+COMMENT ON COLUMN money.goal_id IS 'Р¦РµР»СЊ';
 
 -- Plan
 CREATE TABLE plan (
     id SERIAL PRIMARY KEY,
     goal_id INT REFERENCES goals(id) ON DELETE CASCADE,
     details VARCHAR(255),
-    cost NUMERIC(12,2)
+    cost NUMERIC(12,2),
+    quantity INTEGER
+    isready boolean;
 );
-COMMENT ON TABLE plan IS 'план';
-COMMENT ON COLUMN plan.id IS 'Код';
-COMMENT ON COLUMN plan.goal_id IS 'Цель';
-COMMENT ON COLUMN plan.details IS 'Детализация';
-COMMENT ON COLUMN plan.cost IS 'Стоимость';
+COMMENT ON TABLE plan IS 'РїР»Р°РЅ';
+COMMENT ON COLUMN plan.id IS 'РљРѕРґ';
+COMMENT ON COLUMN plan.goal_id IS 'Р¦РµР»СЊ';
+COMMENT ON COLUMN plan.details IS 'Р”РµС‚Р°Р»РёР·Р°С†РёСЏ';
+COMMENT ON COLUMN plan.cost IS 'РЎС‚РѕРёРјРѕСЃС‚СЊ';
+COMMENT ON COLUMN plan.quantity IS 'РљРѕР»РёС‡РµСЃС‚РІРѕ';
+COMMENT ON COLUMN plan.isready IS 'Р’С‹РїРѕР»РЅРµРЅРѕ';
 
 -- Fact
 CREATE TABLE fact (
     id SERIAL PRIMARY KEY,
     goal_id INT REFERENCES goals(id) ON DELETE CASCADE,
     details VARCHAR(255),
-    cost NUMERIC(12,2)
+    cost NUMERIC(12,2),
+    price NUMERIC(12,2),
+    quantity INTEGER
 );
-COMMENT ON TABLE fact IS 'факт';
-COMMENT ON COLUMN fact.id IS 'Код';
-COMMENT ON COLUMN fact.goal_id IS 'Цель';
-COMMENT ON COLUMN fact.details IS 'Детализация';
-COMMENT ON COLUMN fact.cost IS 'Стоимость';
+COMMENT ON TABLE fact IS 'С„Р°РєС‚';
+COMMENT ON COLUMN fact.id IS 'РљРѕРґ';
+COMMENT ON COLUMN fact.goal_id IS 'Р¦РµР»СЊ';
+COMMENT ON COLUMN fact.details IS 'Р”РµС‚Р°Р»РёР·Р°С†РёСЏ';
+COMMENT ON COLUMN fact.cost IS 'РЎС‚РѕРёРјРѕСЃС‚СЊ';
+COMMENT ON COLUMN fact.price IS 'Р¦РµРЅР°';
+COMMENT ON COLUMN fact.quantity IS 'РљРѕР»РёС‡РµСЃС‚РІРѕ';
 
 -- Subscriptions
 CREATE TABLE subscriptions (
@@ -69,6 +77,6 @@ CREATE TABLE subscriptions (
     goal_id INT REFERENCES goals(id) ON DELETE CASCADE,
     PRIMARY KEY (person_id, goal_id)
 );
-COMMENT ON TABLE subscriptions IS 'подписки';
-COMMENT ON COLUMN subscriptions.person_id IS 'ФИО';
-COMMENT ON COLUMN subscriptions.goal_id IS 'Цель';
+COMMENT ON TABLE subscriptions IS 'РїРѕРґРїРёСЃРєРё';
+COMMENT ON COLUMN subscriptions.person_id IS 'Р¤РРћ';
+COMMENT ON COLUMN subscriptions.goal_id IS 'Р¦РµР»СЊ';

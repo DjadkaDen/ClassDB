@@ -2,48 +2,70 @@ import os
 import sys
 import subprocess
 import json
+import shutil
+import glob
+from PyQt5.QtWidgets import QMessageBox
 
 SCRIPT_PATH = os.path.abspath(__file__)
 PROJECT_DIR = os.path.dirname(SCRIPT_PATH)
 CONFIG_PATH = os.path.join(PROJECT_DIR, "config.json")
 
-def self_update(repo_url):
+def self_update(repo_url, branch="main"):
+    update_dir = os.path.join(PROJECT_DIR, "update")
+
+    def try_update():
+        # если update/ нет → клонируем
+        if not os.path.exists(update_dir):
+            subprocess.check_call(["git", "clone", "-b", branch, repo_url, update_dir])
+
+        # проверяем локальный и удалённый коммиты
+        local = subprocess.check_output(
+            ["git", "-C", update_dir, "rev-parse", "HEAD"],
+            text=True
+        ).strip()
+
+        subprocess.check_call(["git", "-C", update_dir, "fetch", "origin", branch])
+
+        remote = subprocess.check_output(
+            ["git", "-C", update_dir, "rev-parse", f"origin/{branch}"],
+            text=True
+        ).strip()
+
+        if local == remote:
+            print("Обновлений нет.")
+            return False  # обновлений не было
+
+        print(f"Найдены обновления в ветке {branch}. Обновляем update/")
+        subprocess.check_call(["git", "-C", update_dir, "pull", "origin", branch])
+
+        # копируем только .py файлы
+        for pyfile in glob.glob(os.path.join(update_dir, "*.py")):
+            shutil.copy(pyfile, PROJECT_DIR)
+
+        print("Файлы обновлены. Перезапуск...")
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    # --- первая попытка ---
     try:
-        if not os.path.exists(os.path.join(PROJECT_DIR, ".git")):
-            # если запускают не из репозитория — клонируем
-            subprocess.check_call(["git", "clone", repo_url, PROJECT_DIR])
-        else:
-            # обновляем
-            subprocess.check_call(["git", "-C", PROJECT_DIR, "fetch", "origin"])
-            local = subprocess.check_output(
-                ["git", "-C", PROJECT_DIR, "rev-parse", "HEAD"]
-            ).strip()
-            remote = subprocess.check_output(
-                ["git", "-C", PROJECT_DIR, "rev-parse", "origin/master"]
-            ).strip()
+        return try_update()
+    except Exception as e1:
+        print(f"Ошибка автообновления (первая попытка): {e1}")
+        if os.path.exists(update_dir):
+            shutil.rmtree(update_dir)
 
-            if local != remote:
-                print("Обнаружена новая версия. Обновляем...")
-                subprocess.check_call(["git", "-C", PROJECT_DIR, "pull", "origin", "master"])
-                # перезапуск
-                os.execv(sys.executable, [sys.executable] + sys.argv)
-
-    except Exception as e:
-        print(f"Ошибка автообновления: {e}")
-
-
-# --- Проверка обновлений ---
-try:
-    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        config = json.load(f)
-
-    if config.get("auto_update", False):
-        repo_url = config.get("repo_url")
-        if repo_url:
-            self_update(repo_url)
-
-except Exception as e:
-    print(f"Не удалось загрузить config.json для автообновления: {e}")
+        # --- вторая попытка ---
+        try:
+            return try_update()
+        except Exception as e2:
+            print(f"Ошибка автообновления (вторая попытка): {e2}")
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Warning)
+            msg.setWindowTitle("Обновление")
+            msg.setText("Не удалось обновить.\n\n" + str(e2) + "\n\nПродолжить?")
+            msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            if msg.exec_() == QMessageBox.No:
+                sys.exit(1)  # выходим
+            return False
 
 import pyodbc
 from PyQt5.QtCore import Qt, QTimer
@@ -51,7 +73,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QDialog, QTextEdit, QDoubleSpinBox,
     QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QTableWidget, QHeaderView,
     QTableWidgetItem, QCheckBox, QListWidgetItem, QSplitter,
-    QPushButton, QMessageBox, QInputDialog
+    QPushButton, QInputDialog
 )
 
 class PlanFactDialog(QDialog):
