@@ -1,9 +1,6 @@
 import os
 import sys
-import subprocess
 import json
-import shutil
-import glob
 from PyQt5.QtWidgets import QMessageBox
 from db_migrator import ensure_db_structure
 from git_updater import self_update
@@ -33,9 +30,35 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QDialog, QTextEdit, QDoubleSpinBox,
     QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QTableWidget, QHeaderView,
     QTableWidgetItem, QCheckBox, QListWidgetItem, QSplitter,
-    QPushButton, QInputDialog
+    QPushButton, QInputDialog, QLineEdit
 )
 
+class GoalDialog(QDialog):
+    def __init__(self, parent=None, title=""):
+        super().__init__(parent)
+        self.setWindowTitle("Новая цель")
+
+        self.title_edit = QLineEdit(title)
+        self.chk_for_all = QCheckBox("Для всех")
+
+        ok_btn = QPushButton("OK")
+        cancel_btn = QPushButton("Отмена")
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn.clicked.connect(self.reject)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel("Название цели:"))
+        layout.addWidget(self.title_edit)
+        layout.addWidget(self.chk_for_all)
+        layout.addLayout(btn_layout)
+        self.setLayout(layout)
+
+    def getValues(self):
+        return self.title_edit.text().strip(), self.chk_for_all.isChecked()
 class PlanFactDialog(QDialog):
     def __init__(self, parent=None, details='', cost=0.0):
         super().__init__(parent)
@@ -588,15 +611,34 @@ class MainWindow(QMainWindow):
 
     # --- Goals CRUD ---
     def add_goal(self):
-        title, ok = QInputDialog.getText(self, "Новая цель", "Введите название цели:")
-        if not ok or not title.strip():
-            return
-        self.cursor.execute(
-            "INSERT INTO goals (title, priority) VALUES (?, ?);",
-            (title.strip(), 0)
-        )
-        self.conn.commit()
-        self.load_goals()
+        dlg = GoalDialog(self)
+        if dlg.exec_() == QDialog.Accepted:
+            title, for_all = dlg.getValues()
+            if not title:
+                return
+
+            self.cursor.execute(
+                "INSERT INTO goals (title, priority) VALUES (?, ?);",
+                (title, 0)
+            )
+            self.conn.commit()
+
+            # получаем id новой цели
+            self.cursor.execute("SELECT id FROM goals WHERE title = ? ORDER BY id DESC LIMIT 1;", (title,))
+            goal_id = self.cursor.fetchone()[0]
+
+            # если стоит галка → подписываем всех людей
+            if for_all:
+                self.cursor.execute("SELECT id FROM people;")
+                all_people = [row[0] for row in self.cursor.fetchall()]
+                for pid in all_people:
+                    self.cursor.execute(
+                        "INSERT INTO subscriptions (person_id, goal_id) VALUES (?, ?) ON CONFLICT DO NOTHING;",
+                        (pid, goal_id)
+                    )
+                self.conn.commit()
+
+            self.load_goals()
 
     def edit_goal(self):
         row = self.goals_table.currentRow()
