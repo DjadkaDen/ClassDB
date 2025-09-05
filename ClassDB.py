@@ -30,7 +30,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QDialog, QTextEdit, QDoubleSpinBox,
     QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QTableWidget, QHeaderView,
     QTableWidgetItem, QCheckBox, QListWidgetItem, QSplitter,
-    QPushButton, QInputDialog, QLineEdit
+    QPushButton, QInputDialog, QLineEdit, QSpinBox
 )
 
 class GoalDialog(QDialog):
@@ -59,16 +59,45 @@ class GoalDialog(QDialog):
 
     def getValues(self):
         return self.title_edit.text().strip(), self.chk_for_all.isChecked()
+
 class PlanFactDialog(QDialog):
-    def __init__(self, parent=None, details='', cost=0.0):
+    def __init__(self, parent=None, details='', quantity=1, price=0.0, cost=0.0, is_fact=False, people_count=1):
         super().__init__(parent)
-        self.setWindowTitle("Новый")
+        self.setWindowTitle("Новая запись")
+
+        self.is_fact = is_fact
+        self.old_qty = quantity
+        self.people_count = people_count
+
+        # Детализация
         self.details_edit = QTextEdit()
         self.details_edit.setPlainText(details)
+
+        # Количество
+        self.qty_label = QLabel("Количество:")
+        self.qty_spin = QSpinBox()
+        self.qty_spin.setRange(1, 1000000)
+        self.qty_spin.setValue(quantity)
+
+        # Цена
+        self.price_spin = QDoubleSpinBox()
+        self.price_spin.setRange(0, 1000000)
+        self.price_spin.setDecimals(2)
+        self.price_spin.setValue(price)
+
+        # Стоимость
         self.cost_spin = QDoubleSpinBox()
-        self.cost_spin.setRange(-1000000, 1000000)
+        self.cost_spin.setRange(0, 1000000000)
         self.cost_spin.setDecimals(2)
         self.cost_spin.setValue(cost)
+
+        # Сигналы
+        self.qty_spin.valueChanged.connect(self.on_qty_changed)
+        self.price_spin.valueChanged.connect(self.recalc_cost)
+        self.cost_spin.valueChanged.connect(self.recalc_price)
+
+        # Двойной клик по надписи "Количество"
+        self.qty_label.mouseDoubleClickEvent = self.on_qty_label_doubleclick
 
         ok_btn = QPushButton("OK")
         cancel_btn = QPushButton("Отмена")
@@ -83,13 +112,69 @@ class PlanFactDialog(QDialog):
         layout = QVBoxLayout()
         layout.addWidget(QLabel("Детализация:"))
         layout.addWidget(self.details_edit)
+        layout.addWidget(self.qty_label)
+        layout.addWidget(self.qty_spin)
+        layout.addWidget(QLabel("Цена:"))
+        layout.addWidget(self.price_spin)
         layout.addWidget(QLabel("Стоимость:"))
         layout.addWidget(self.cost_spin)
         layout.addLayout(btn_layout)
         self.setLayout(layout)
 
+    def on_qty_changed(self, new_qty):
+        price = self.price_spin.value()
+        cost = self.cost_spin.value()
+
+        if price > 0 and cost > 0:
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Пересчёт")
+            msg.setText("Количество изменено. Что пересчитать?")
+            btn_price = msg.addButton("Цену", QMessageBox.ActionRole)
+            btn_cost = msg.addButton("Стоимость", QMessageBox.ActionRole)
+            btn_cancel = msg.addButton("Отмена", QMessageBox.RejectRole)
+            msg.exec_()
+
+            clicked = msg.clickedButton()
+            if clicked == btn_price:
+                self.recalc_price()
+            elif clicked == btn_cost:
+                self.recalc_cost()
+            else:
+                # откат количества
+                self.qty_spin.blockSignals(True)
+                self.qty_spin.setValue(self.old_qty)
+                self.qty_spin.blockSignals(False)
+                return
+
+        # обновляем old_qty
+        self.old_qty = new_qty
+
+    def on_qty_label_doubleclick(self, event):
+        if self.qty_spin.value() == 1:
+            self.qty_spin.setValue(self.people_count)
+
+    def recalc_cost(self):
+        qty = self.qty_spin.value()
+        price = self.price_spin.value()
+        self.cost_spin.blockSignals(True)
+        self.cost_spin.setValue(qty * price)
+        self.cost_spin.blockSignals(False)
+
+    def recalc_price(self):
+        qty = self.qty_spin.value()
+        cost = self.cost_spin.value()
+        if qty > 0:
+            self.price_spin.blockSignals(True)
+            self.price_spin.setValue(cost / qty)
+            self.price_spin.blockSignals(False)
+
     def getValues(self):
-        return self.details_edit.toPlainText(), float(self.cost_spin.value())
+        return (
+            self.details_edit.toPlainText(),
+            self.qty_spin.value(),
+            float(self.price_spin.value()),
+            float(self.cost_spin.value())
+        )
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -495,16 +580,21 @@ class MainWindow(QMainWindow):
     def add_plan(self):
         if not hasattr(self, "current_goal_id") or self.current_goal_id is None:
             return
-        dlg = PlanFactDialog(self)
+
+        self.cursor.execute("SELECT COUNT(*) FROM people;")
+        people_count = self.cursor.fetchone()[0]
+
+        dlg = PlanFactDialog(self, is_fact=False, people_count=people_count)
         if dlg.exec_() == QDialog.Accepted:
-            details, cost = dlg.getValues()
+            details, qty, price, cost = dlg.getValues()
             self.cursor.execute(
-                "INSERT INTO plan (goal_id, details, cost) VALUES (?, ?, ?);",
-                (self.current_goal_id, details, cost)
+                "INSERT INTO plan (goal_id, details, quantity, cost) VALUES (?, ?, ?, ?);",
+                (self.current_goal_id, details, qty, cost)
             )
             self.conn.commit()
             self.load_plans()
             self.load_goals()
+
 
     def edit_plan(self, row, col):
         self._edit_plan(row)
@@ -563,12 +653,16 @@ class MainWindow(QMainWindow):
     def add_fact(self):
         if not hasattr(self, "current_goal_id") or self.current_goal_id is None:
             return
-        dlg = PlanFactDialog(self)
+
+        self.cursor.execute("SELECT COUNT(*) FROM people;")
+        people_count = self.cursor.fetchone()[0]
+
+        dlg = PlanFactDialog(self, is_fact=True, people_count=people_count)
         if dlg.exec_() == QDialog.Accepted:
-            details, cost = dlg.getValues()
+            details, qty, price, cost = dlg.getValues()
             self.cursor.execute(
-                "INSERT INTO fact (goal_id, details, cost) VALUES (?, ?, ?);",
-                (self.current_goal_id, details, cost)
+                "INSERT INTO fact (goal_id, details, quantity, price, cost) VALUES (?, ?, ?, ?, ?);",
+                (self.current_goal_id, details, qty, price, cost)
             )
             self.conn.commit()
             self.load_facts()
