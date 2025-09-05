@@ -1,3 +1,26 @@
+-- Params: Параметры БД
+CREATE TYPE param_name AS ENUM ('db_version');
+
+CREATE TABLE params (
+    id SERIAL PRIMARY KEY,
+    param_name param_name NOT NULL,
+    param_value varchar(100) NOT NULL,
+    description VARCHAR(255),
+    CONSTRAINT params_name_unique UNIQUE (param_name)
+);
+COMMENT ON TABLE params IS 'Параметры БД';
+COMMENT ON COLUMN params.id IS 'Код';
+COMMENT ON COLUMN params.param_name IS 'Параметр';
+COMMENT ON COLUMN params.param_value IS 'Значение';
+COMMENT ON COLUMN params.description IS 'Описание';
+
+INSERT INTO params (param_name, param_value, description)
+VALUES ('db_version'::param_name, '00.04', 'Database version number')
+ON CONFLICT (param_name) 
+DO UPDATE SET 
+    param_value = EXCLUDED.param_value,
+    description = EXCLUDED.description;
+
 -- People
 CREATE TABLE people (
     id SERIAL PRIMARY KEY,
