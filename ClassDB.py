@@ -29,7 +29,7 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QDialog, QTextEdit, QDoubleSpinBox,
     QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QTableWidget, QHeaderView,
-    QTableWidgetItem, QCheckBox, QListWidgetItem, QSplitter,
+    QTableWidgetItem, QCheckBox, QListWidgetItem, QSplitter, QAction,
     QPushButton, QInputDialog, QLineEdit, QSpinBox, QComboBox
 )
 
@@ -246,6 +246,27 @@ class MainWindow(QMainWindow):
         tabs = QTabWidget()
         self.setCentralWidget(tabs)
 
+        # --- Верхнее меню ---
+        menubar = self.menuBar()
+
+        file_menu = menubar.addMenu("File")
+
+        # Backup
+        backup_action = QAction("Backup", self)
+        backup_action.triggered.connect(self.backup)
+        file_menu.addAction(backup_action)
+
+        # Restore
+        restore_action = QAction("Restore", self)
+        restore_action.triggered.connect(self.restore)
+        file_menu.addAction(restore_action)
+
+        # Exit
+        exit_action = QAction("Exit", self)
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+
+
         # --- Вкладка Люди ---
         people_tab = QWidget()
         people_layout = QHBoxLayout()
@@ -257,9 +278,17 @@ class MainWindow(QMainWindow):
         left_widget.setLayout(left_layout)
 
         # Список людей
-        self.people_list = QListWidget()
-        self.people_list.currentItemChanged.connect(self.load_person_data)
-        left_layout.addWidget(self.people_list, 1)
+        self.people_table = QTableWidget()
+        self.people_table.setColumnCount(2)
+        self.people_table.verticalHeader().setDefaultSectionSize(20)  # фиксируем высоту строк
+        self.people_table.setHorizontalHeaderLabels(["ФИО", "Сумма"])
+        self.people_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.people_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.people_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.people_table.setSelectionMode(QTableWidget.SingleSelection)
+        self.people_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.people_table.cellClicked.connect(self.load_person_data)
+        left_layout.addWidget(self.people_table, 1)
 
         # Кнопки для списка людей
         people_btns = QHBoxLayout()
@@ -438,17 +467,28 @@ class MainWindow(QMainWindow):
         self.load_goals()
 
     def load_people(self):
-        self.people_list.clear()
-        self.cursor.execute("SELECT id, full_name FROM people ORDER BY full_name;")
-        for row in self.cursor.fetchall():
-            item = QListWidgetItem(row[1])
-            item.setData(1, row[0])
-            self.people_list.addItem(item)
+        self.cursor.execute("""
+            SELECT p.id, p.full_name, COALESCE(SUM(m.amount), 0) as total
+            FROM people p
+            LEFT JOIN money m ON p.id = m.person_id
+            GROUP BY p.id, p.full_name
+            ORDER BY p.full_name;
+        """)
+        rows = self.cursor.fetchall()
 
-    def load_person_data(self, current, previous):
-        if current is None:
+        self.people_table.setRowCount(len(rows))
+        for i, (person_id, full_name, total) in enumerate(rows):
+            item_name = QTableWidgetItem(full_name)
+            item_name.setData(1, person_id)   # сохраняем id в data
+            self.people_table.setItem(i, 0, item_name)
+            self.people_table.setItem(i, 1, QTableWidgetItem(f"{total:.2f}"))
+
+
+    def load_person_data(self, row, col):
+        if row < 0:
             return
-        self.person_id = current.data(1)
+        item = self.people_table.item(row, 0)
+        self.person_id = item.data(1)
 
         # --- Подписки ---
         self.subscriptions_list.clear()
@@ -860,6 +900,12 @@ class MainWindow(QMainWindow):
             self.cursor.execute("DELETE FROM people WHERE id = ?;", (person_id,))
             self.conn.commit()
             self.load_people()
+
+    def backup(self):
+        QMessageBox.information(self, "Backup", "Функция резервного копирования пока не реализована.")
+
+    def restore(self):
+        QMessageBox.information(self, "Restore", "Функция восстановления пока не реализована.")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
