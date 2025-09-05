@@ -30,9 +30,51 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QTabWidget, QWidget, QDialog, QTextEdit, QDoubleSpinBox,
     QVBoxLayout, QHBoxLayout, QListWidget, QLabel, QTableWidget, QHeaderView,
     QTableWidgetItem, QCheckBox, QListWidgetItem, QSplitter,
-    QPushButton, QInputDialog, QLineEdit, QSpinBox
+    QPushButton, QInputDialog, QLineEdit, QSpinBox, QComboBox
 )
 
+class MoneyDialog(QDialog):
+    def __init__(self, parent=None, goals=None):
+        super().__init__(parent)
+        self.setWindowTitle("Новая запись денег")
+
+        self.amount_spin = QDoubleSpinBox()
+        self.amount_spin.setRange(-1000000, 1000000)
+        self.amount_spin.setDecimals(2)
+
+        self.goals_combo = QComboBox()
+        if goals:
+            for goal_id, title in goals:
+                self.goals_combo.addItem(title, goal_id)
+
+        self.chk_for_all = QCheckBox("Добавить всем")
+
+        ok_btn = QPushButton("OK")
+        cancel_btn = QPushButton("Отмена")
+        ok_btn.clicked.connect(self.accept)
+        cancel_btn.clicked.connect(self.reject)
+
+        layout = QVBoxLayout()
+        layout.addWidget(QLabel("Сумма:"))
+        layout.addWidget(self.amount_spin)
+        layout.addWidget(QLabel("Цель:"))
+        layout.addWidget(self.goals_combo)
+        layout.addWidget(self.chk_for_all)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(ok_btn)
+        btn_layout.addWidget(cancel_btn)
+        layout.addLayout(btn_layout)
+
+        self.setLayout(layout)
+
+    def getValues(self):
+        return (
+            self.amount_spin.value(),
+            self.goals_combo.currentData(),
+            self.chk_for_all.isChecked()
+        )
 class GoalDialog(QDialog):
     def __init__(self, parent=None, title=""):
         super().__init__(parent)
@@ -469,20 +511,33 @@ class MainWindow(QMainWindow):
     def add_money(self):
         if not hasattr(self, "person_id"):
             return
-        amount, ok = QInputDialog.getDouble(self, "Новая запись", "Введите сумму:", 0, -1000000, 1000000, 2)
-        if not ok:
-            return
-        goal_id, ok = QInputDialog.getInt(self, "Новая запись", "Введите ID цели:", 1, 1, 999999)
-        if not ok:
-            return
 
-        self.cursor.execute(
-            "INSERT INTO money (person_id, amount, date, goal_id) VALUES (?, ?, now(), ?) RETURNING id;",
-            (self.person_id, amount, goal_id)
-        )
-        self.conn.commit()
-        self.load_money()
-        self.load_goals()
+        # получаем список целей для выпадающего списка
+        self.cursor.execute("SELECT id, title FROM goals ORDER BY title;")
+        goals = self.cursor.fetchall()
+
+        dlg = MoneyDialog(self, goals)
+        if dlg.exec_() == QDialog.Accepted:
+            amount, goal_id, for_all = dlg.getValues()
+            if for_all:
+                # вставляем для всех людей
+                self.cursor.execute("SELECT id FROM people;")
+                all_people = [row[0] for row in self.cursor.fetchall()]
+                for pid in all_people:
+                    self.cursor.execute(
+                        "INSERT INTO money (person_id, amount, date, goal_id) VALUES (?, ?, now(), ?);",
+                        (pid, amount, goal_id)
+                    )
+            else:
+                # вставляем только для выбранного человека
+                self.cursor.execute(
+                    "INSERT INTO money (person_id, amount, date, goal_id) VALUES (?, ?, now(), ?);",
+                    (self.person_id, amount, goal_id)
+                )
+
+            self.conn.commit()
+            self.load_money()
+            self.load_goals()
 
     def edit_money(self, row, col):
         """Редактирование по двойному клику"""
